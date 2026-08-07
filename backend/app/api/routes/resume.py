@@ -1,56 +1,69 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import pytesseract
-from PIL import Image
+from PIL import Image # Pillow lib 
 import io
-import fitz  # PyMuPDF (IMPORTANT for PDFs)
+import fitz  # PyMuPDF
 
+# Required for Windows
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
 router = APIRouter()
 
+
+#  Clean extracted text
 def clean_text(text: str) -> str:
     return " ".join(text.split())
 
-# 🔍 Function to extract text from PDF using OCR
-def extract_text_from_pdf(contents: bytes) -> str:
+
+#  1. Direct text extraction (for normal PDFs)
+def extract_text_with_pymupdf(contents: bytes) -> str:
+    text = ""
+    pdf = fitz.open(stream=contents, filetype="pdf")
+
+    for page in pdf:
+        text += page.get_text()
+
+    return text.strip()
+
+
+#  2. OCR extraction (for scanned PDFs)
+def extract_text_with_ocr(contents: bytes) -> str:
     text = ""
 
-    try:
-        # Open PDF from bytes
-        pdf = fitz.open(stream=contents, filetype="pdf")
+    pdf = fitz.open(stream=contents, filetype="pdf")
 
-        for page_num in range(len(pdf)):
-            page = pdf.load_page(page_num)
+    for page in pdf:
+        pix = page.get_pixmap()
+        img_bytes = pix.tobytes("png")
 
-            # Convert PDF page to image
-            pix = page.get_pixmap()
-            img_bytes = pix.tobytes("png")
+        image = Image.open(io.BytesIO(img_bytes))
+        page_text = pytesseract.image_to_string(image)
 
-            # Convert to PIL Image
-            image = Image.open(io.BytesIO(img_bytes))
+        text += page_text + "\n"
 
-            # OCR using Tesseract
-            page_text = pytesseract.image_to_string(image)
-
-            text += page_text + "\n"
-
-        return text.strip()
-
-    except Exception as e:
-        raise Exception(f"OCR Extraction Failed: {str(e)}")
+    return text.strip()
 
 
-# 🚀 API Endpoint
+#  3. Hybrid function (BEST PRACTICE)
+def extract_text(contents: bytes) -> str:
+    # Try direct extraction first
+    text = extract_text_with_pymupdf(contents)
+
+    if text.strip():
+        return text
+    else:
+        return extract_text_with_ocr(contents)
+
+
+#  API Endpoint
 @router.post("/upload-resume")
 async def upload_resume(file: UploadFile = File(...)):
     try:
-        contents = await file.read()   # ✅ correct async read
+        contents = await file.read()
 
-        print("File received:", file.filename)
-
-        # Extract text using OCR
-        text = extract_text_from_pdf(contents)
+        # Use hybrid extraction
+        text = extract_text(contents)
         cleaned_text = clean_text(text)
-        print("Extracted text:", text)
 
         return {
             "filename": file.filename,
@@ -58,5 +71,4 @@ async def upload_resume(file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        print("ERROR:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
