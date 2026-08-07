@@ -21,3 +21,13 @@ class UserResponse(BaseModel):
         from_attributes = True # This means you can convert 
         #SQLAlchemy objects to JSON response 
         #without his FastAPI cannot return DB objects properly
+
+
+class UserLogin(BaseModel):
+    email: str 
+    password: str       
+
+
+class Token(BaseModel):
+    access_token: str 
+    token_type: str       
