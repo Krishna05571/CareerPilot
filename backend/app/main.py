@@ -5,6 +5,8 @@ from app.database.base import Base
 #Import all models here 
 from app.models.user import User
 from app.api.routes import user
+from app.api.routes import resume
+
 
 app = FastAPI()
 #one of the FASTAPI event whenever uvicorn runs this function runs once   
@@ -15,6 +17,9 @@ def startup():
     Base.metadata.create_all(bind=engine)
 
 app.include_router(user.router,prefix = "/api")
+
+app.include_router(resume.router,prefix = "/api",tags=["Resume"])
+
 @app.get("/")
 def root():
     return {
