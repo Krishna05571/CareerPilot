@@ -8,21 +8,24 @@
 
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from app.core.config import DATABASE_URL
 
-engine = create_engine(DATABASE_URL)
+#Database Engine imported in main.py to create tables on startup   
+engine = create_engine(
+    DATABASE_URL,
+    echo=True # TRUE->Print every SQL Query ... later will change to FALSE 
+    )
 
+#Database Session Factory
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine,
 )
 
-Base = declarative_base()
-
-
+#Dependency function to get a database session for each request
 def get_db():
     db = SessionLocal()
     try:
